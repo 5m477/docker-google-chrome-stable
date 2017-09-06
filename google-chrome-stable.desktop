@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=Google Chrome Stable
+Type=Application
+Exec=~/.local/share/bin/google-chrome-stable %u

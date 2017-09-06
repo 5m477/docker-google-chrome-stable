@@ -1,0 +1,63 @@
+#! /bin/bash
+
+NAME=chrome
+SECCOMP_PROFILE=${HOME}/.cache/chrome-seccomp.json
+DATA_DIR=${HOME}/.chrome
+
+if [[ ! -e ${SECCOMP_PROFILE} ]]; then
+    curl -o ${SECCOMP_PROFILE} https://raw.githubusercontent.com/jessfraz/dotfiles/master/etc/docker/seccomp/chrome.json
+fi
+
+state=$(docker inspect --format "{{.State.Running}}" "${NAME}" 2>/dev/null)
+
+if [[ "${state}" == "false" ]]; then
+    docker rm ${NAME} >/dev/null
+fi
+
+if [[ "${state}" == "false" || "${state}" == "" ]]; then
+    docker run -d \
+        -u $(id -u):$(id -g) \
+        --group-add $(getent group video | cut -d: -f3) \
+        --group-add $(getent group audio | cut -d: -f3) \
+        -v /etc/passwd:/etc/passwd:ro \
+        -v /etc/group:/etc/group:ro \
+        -v /dev/shm:/dev/shm \
+        -v /etc/localtime:/etc/localtime:ro \
+        -v /etc/machine-id:/etc/machine-id:ro \
+        -v /etc/resolv.conf:/etc/resolv.conf:ro \
+        -v /etc/ssl/certs:/etc/ssl/certs:ro \
+        -v /etc/ca-certificates/extracted/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt:ro \
+        -v /etc/ca-certificates:/etc/ca-certificates:ro \
+        -v ${HOME}/.chrome:${HOME}/ \
+        -v ${HOME}/Downloads:${HOME}/Downloads \
+        -v /etc/hosts:/etc/hosts:ro \
+        -v /run/user/${UID}/pulse:/run/user/${UID}/pulse \
+        -v /run/dbus:/run/dbus \
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -e "DISPLAY=unix${DISPLAY}" \
+        -e DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS} \
+        --security-opt seccomp:${SECCOMP_PROFILE} \
+        --device /dev/bus/usb \
+        --device /dev/dri \
+        --device /dev/snd \
+        --device /dev/usb \
+        --device /dev/video0 \
+        --entrypoint="" \
+        --name ${NAME} \
+        --net host \
+        --net local-net \
+        jess/chrome \
+            google-chrome \
+                --user-data-dir=${DATA_DIR} \
+                $@ \
+        2>/dev/null
+fi
+
+if [[ "$state" == "true" ]]; then
+    docker exec -d \
+        ${NAME} \
+        google-chrome \
+            --user-data-dir=${DATA_DIR} \
+            $@
+fi
+
